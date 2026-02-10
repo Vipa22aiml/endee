@@ -286,6 +286,120 @@ int main(int argc, char** argv) {
         return crow::response(200, response.dump());
     });
 
+    // new create index
+    CROW_ROUTE(app, "/api/v1/index/newcreate")
+            .CROW_MIDDLEWARES(app, AuthMiddleware)
+            .methods("POST"_method)([&index_manager, &app](const crow::request& req) {
+                auto& ctx = app.get_context<AuthMiddleware>(req);
+
+                auto body = crow::json::load(req.body);
+                if(!body) {
+                    return json_error(400, "Invalid JSON");
+                }
+
+                if(!body.has("index_name") || body["index_name"].t() != crow::json::type::String){
+                    return json_error(400, "Parameters error: 'index_name'");
+                }
+
+                std::string index_id = ctx.username + "/" + std::string(body["index_name"].s());
+                std::cout << "index id: " << index_id << "\n";
+
+                /**
+                 * create a struct for each dense vector in the list
+                 */
+                if(body.has("dense_vectors")){
+                    printf("index has dense vectors\n");
+                    auto& dense_blocks = body["dense_vectors"];
+
+                    for(auto& key: dense_blocks.keys()){
+                        // struct IndexConfig index_config;
+
+                        printf("dense_vectors has index_key:%s\n", key.c_str());
+                        auto& config = dense_blocks[key];
+
+                        // dim is mandatory
+                        size_t dim;
+                        if(!config.has("dim") || config["dim"].t() != crow::json::type::Number){
+                            return json_error(400, "Parameters error: 'dim'");
+                        }
+                        dim = (size_t)config["dim"].i();
+                        std::cout << "dim: " << dim << "\n";
+
+
+                        // Space_type is mandatory
+                        std::string space_type;
+                        if(!config.has("space_type") || config["space_type"].t() != crow::json::type::String){
+                            return json_error(400, "Parameters error: 'dim'");
+                        }
+                        space_type = (std::string)config["space_type"].s();
+                        std::cout << "space_type: " << space_type << "\n";
+
+
+                        size_t m = settings::DEFAULT_M;
+                        if(config.has("M")){
+                            if(config["M"].t() != crow::json::type::Number){
+                                return json_error(400, "Parameters error: 'M'");
+                            }
+                            m = (size_t)config["M"].i();
+                        }
+                        std::cout << "m: " << m << "\n";
+
+                        size_t ef_con = settings::DEFAULT_EF_CONSTRUCT;
+                        if(config.has("ef_con")){
+                            if(config["ef_con"].t() != crow::json::type::Number){
+                                return json_error(400, "Parameters error: 'ef_con'");
+                            }
+                            ef_con = (size_t)config["ef_con"].i();
+                        }
+                        std::cout << "ef_con: " << ef_con << "\n";
+
+                        ndd::quant::QuantizationLevel quant_level = ndd::quant::QuantizationLevel::INT8;
+                        if(config.has("precision")){
+                            if(config["precision"].t() != crow::json::type::String){
+                                return json_error(400, "Parameters error: 'precision'");
+                            }
+                            quant_level = stringToQuantLevel(config["precision"].s());
+                        }
+                        std::cout << "quant level: " << quantLevelToString(quant_level) << "\n";
+
+                        int32_t checksum = -1;
+                        if(config.has("checksum")){
+                            if(config["checksum"].t() != crow::json::type::Number){
+                                return json_error(400, "Parameters error: 'checksum'");
+                            }
+                            checksum = config["checksum"].i();
+                        }
+
+                        size_t size_in_millions = 0;
+                        if(config.has("size_in_millions")){
+                            if(config["size_in_millions"].t() != crow::json::type::Number){
+                                return json_error(400, "Parameters error: 'size_in_millions'");
+                            }
+                            checksum = config["size_in_millions"].i();
+                        }
+
+                        // index_config = IndexConfig {dim,
+                        //            sparse_dim,
+                        //            settings::MAX_ELEMENTS,  // max elements
+                        //            body["space_type"].s(),
+                        //            m,
+                        //            ef_con,
+                        //            quant_level,
+                        //            checksum};
+
+                        // if(!check_creation_sanity(struct IndexConfig conf)){
+                        //     return json_error(400, "error");
+                        // }
+                    }
+                }
+
+                if(body.has("sparse_vectors")){
+                    printf("index has sparse vectors\n");
+                }
+
+                return crow::response(200, "Index created successfully");
+            });
+
     // Create index
     CROW_ROUTE(app, "/api/v1/index/create")
             .CROW_MIDDLEWARES(app, AuthMiddleware)
