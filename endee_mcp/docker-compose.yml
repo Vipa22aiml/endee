@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Endee Vector Database
+  endee:
+    image: endeeio/endee-server:latest
+    container_name: endee-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - endee-data:/data
+    environment:
+      NDD_NUM_THREADS: 0
+      NDD_AUTH_TOKEN: ${ENDEE_AUTH_TOKEN:-}
+      NDD_MAX_MEMORY_GB: ${ENDEE_MAX_MEMORY_GB:-8}
+    ulimits:
+      nofile: 100000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Endee MCP Server
+  mcp:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile
+    container_name: endee-mcp
+    depends_on:
+      endee:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # Endee connection
+      ENDEE_URL: http://endee:8080
+      ENDEE_AUTH_TOKEN: ${ENDEE_AUTH_TOKEN:-}
+      
+      # Embedding configuration
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-auto}
+      
+      # OpenAI (BYOK)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      
+      # Local embedding model
+      LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      PRELOAD_LOCAL_MODEL: ${PRELOAD_LOCAL_MODEL:-false}
+      
+      # MCP transport
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-stdio}
+      MCP_SSE_PORT: 3000
+    volumes:
+      - mcp-cache:/app/cache
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  endee-data:
+    driver: local
+  mcp-cache:
+    driver: local

@@ -1,5 +1,9 @@
 # Endee: High-Performance Open Source Vector Database
 
+## Endee MCP Project
+
+The Endee MCP project lives in `endee_mcp/` in this fork. See `endee_mcp/README.md` for setup and usage.
+
 **Endee (nD)** is a specialized, high-performance vector database built for speed and efficiency. This guide covers supported platforms, dependency requirements, and detailed build instructions using both our automated installer and manual CMake configuration.
 
 there are 3 ways to build and run endee:
