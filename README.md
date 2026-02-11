@@ -1,389 +1,143 @@
-# Endee: High-Performance Open Source Vector Database
+# Endee MCP Framework
 
-## Endee MCP Project
+MCP (Model Context Protocol) server for Endee Vector Database. This fork focuses on the MCP integration so AI tools like Claude Code, OpenCode, and Cursor can access Endee search workflows.
 
-The Endee MCP project lives in `endee_mcp/` in this fork. See `endee_mcp/README.md` for setup and usage.
+<!-- Screenshot: Endee MCP in Claude Code -->
 
-**Endee (nD)** is a specialized, high-performance vector database built for speed and efficiency. This guide covers supported platforms, dependency requirements, and detailed build instructions using both our automated installer and manual CMake configuration.
-
-there are 3 ways to build and run endee:
-1. quick installation and run using install.sh and run.sh scripts
-2. manual build using cmake
-3. using docker
-
-also you can run endee using docker from docker hub without building it locally. refer to section 4 for more details.
-
----
-
-## System Requirements
-
-Before installing, ensure your system meets the following hardware and operating system requirements.
-
-### Supported Operating Systems
-
-* **Linux**: Ubuntu(22.04, 24.04, 25.04) Debian(12, 13), Rocky(8, 9, 10), Centos(8, 9, 10), Fedora(40, 42, 43)
-* **macOS**: Apple Silicon (M Series) only.
-
-### Required Dependencies
-
-The following packages are required for compilation.
-
- `clang-19`, `cmake`, `build-essential`, `libssl-dev`, `libcurl4-openssl-dev`
-
-> **Note:** The build system requires **Clang 19** (or a compatible recent Clang version) supporting C++20.
-
----
-
-## 1. Quick Installation (Recommended)
-
-The easiest way to build **ndd** is using the included `install.sh` script. This script handles OS detection, dependency checks, and configuration automatically.
-
-### Usage
-
-First, ensure the script is executable:
-```bash
-chmod +x ./install.sh
-```
-
-Run the script from the root of the repository. You **must** provide arguments for the build mode and/or CPU optimization.
+## Quick Start
 
 ```bash
-./install.sh [BUILD_MODE] [CPU_OPTIMIZATION]
+# Clone this fork
+git clone https://github.com/Vipa22aiml/endee_mcp.git
+cd endee_mcp/endee_mcp
+
+# Copy environment configuration
+cp .env.example .env
+
+# Start services
+docker-compose up -d
+
+# Configure your AI tool (see below)
 ```
 
-### Build Arguments
+## Features
 
-You can combine one **Build Mode** and one **CPU Optimization** flag.
+- **21 MCP Tools**: Complete coverage of Endee functionality
+- **Dual Embedding Support**: BYOK (OpenAI) + Local (sentence-transformers)
+- **Easy Deployment**: Docker Compose with Endee + MCP services
+- **Multiple Transports**: stdio (primary) + SSE (optional)
 
-#### Build Modes
+## MCP Tools
 
-| Flag | Description | CMake Equivalent |
-| --- | --- | --- |
-| `--release` | **Default.** Optimized release build. |  |
-| `--debug_all` | Enables full debugging symbols. | `-DND_DEBUG=ON -DDEBUG=ON` |
-| `--debug_nd` | Enables NDD-specific logging/timing. | `-DND_DEBUG=ON` |
+### Index Management
 
-#### CPU Optimization Options
+- `endee_create_index`
+- `endee_list_indexes`
+- `endee_describe_index`
+- `endee_delete_index`
 
-Select the flag matching your hardware to enable SIMD optimizations.
+### Vector Operations
 
-| Flag | Description | Target Hardware |
-| --- | --- | --- |
-| `--avx2` | Enables AVX2 (FMA, F16C) | Modern x86_64 Intel/AMD |
-| `--avx512` | Enables AVX512 (F, BW, VNNI, FP16) | Server-grade x86_64 (Xeon/Epyc) |
-| `--neon` | Enables NEON (FP16, DotProd) | Apple Silicon / ARMv8.2+ |
-| `--sve2` | Enables SVE2 (INT8/16, FP16) | ARMv9 / SVE2 compatible |
+- `endee_upsert_vectors`
+- `endee_upsert_documents`
+- `endee_get_vector`
+- `endee_delete_vector`
+- `endee_delete_by_filter`
+- `endee_update_filters`
 
-> **Note:** The `--avx512` build configuration enforces mandatory runtime checks for specific instruction sets. To successfully run this build, your CPU must support **`avx512` (Foundation), `avx512_fp16`, `avx512_vnni`, `avx512bw`, and `avx512_vpopcntdq`**; if any of these extensions are missing, the database will fail to initialize and exit immediately to avoid runtime crashes.
+### Search
 
+- `endee_search`
+- `endee_search_text`
+- `endee_hybrid_search`
 
-### Example Commands
+### Batch Import
 
-**Build for Production (Intel/AMD with AVX2):**
+- `endee_import_json`
+- `endee_import_csv`
 
-```bash
-./install.sh --release --avx2
+### Backup
+
+- `endee_create_backup`
+- `endee_list_backups`
+- `endee_restore_backup`
+- `endee_delete_backup`
+
+### System
+
+- `endee_health_check`
+- `endee_get_config`
+
+## Documentation
+
+- `endee_mcp/TODO.md` - Implementation status and task list
+- `endee_mcp/CONFIGURATION.md` - Environment variables and setup
+- `endee_mcp/TOOLS.md` - Complete tool reference
+- `endee_mcp/mcp/README.md` - MCP server documentation
+
+## AI Tool Configuration
+
+### Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "endee": {
+      "command": "docker",
+      "args": ["exec", "-i", "endee-mcp", "python", "-m", "endee_mcp.server"]
+    }
+  }
+}
 ```
 
-**Example Build for Debugging (Apple Silicon):**
+### OpenCode
 
-```bash
-./install.sh --debug_all --neon
+```json
+{
+  "mcp": {
+    "endee": {
+      "type": "local",
+      "command": ["python", "-m", "endee_mcp.server"],
+      "environment": {
+        "ENDEE_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
 ```
 
-### Running the Server
+### Cursor
 
-We provide a `run.sh` script to simplify running the server. It automatically detects the built binary and uses `ndd_data_dir=./data` by default.
-
-First, ensure the script is executable:
-
-```bash
-chmod +x ./run.sh
+```json
+{
+  "servers": {
+    "endee": {
+      "command": "python",
+      "args": ["-m", "endee_mcp.server"],
+      "env": {
+        "ENDEE_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
 ```
 
-Then run the script:
+## Project Structure
 
-```bash
-./run.sh
 ```
-
-This will automatically identify the latest binary and start the server.
-
-#### Options
-
-You can override the defaults using arguments:
-
-*   `ndd_data_dir=DIR`: Set the data directory.
-*   `binary_file=FILE`: Set the binary file to run.
-*   `ndd_auth_token=TOKEN`: Set the authentication token (leave empty/ignore to run without authentication).
-
-#### Examples
-
-**Run with custom data directory:**
-
-```bash
-./run.sh ndd_data_dir=./my_data
+endee_mcp/
+├── endee/              # Endee vector database (cloned)
+├── mcp/                # MCP server package
+│   ├── src/endee_mcp/  # Source code
+│   ├── pyproject.toml  # Python dependencies
+│   └── Dockerfile      # Container build
+├── docker-compose.yml  # Docker orchestration
+├── .env.example        # Configuration template
+├── TODO.md            # Implementation tasks
+├── CONFIGURATION.md   # Setup guide
+└── TOOLS.md           # Tool reference
 ```
-
-**Run specific binary:**
-
-```bash
-./run.sh binary_file=./build/ndd-avx2
-```
-
-**Run with authentication token:**
-
-```bash
-./run.sh ndd_auth_token=your_token
-```
-
-
-**Run with all options**
-
-```bash
-./run.sh ndd_data_dir=./my_data binary_file=./build/ndd-avx2 ndd_auth_token=your_token
-```
-
-**For Help**
-
-```bash
-./run.sh --help
-```
-
-
-## 2. Manual Build (Advanced)
-
-If you prefer to configure the build manually or integrate it into an existing install pipeline, you can use `cmake` directly.
-
-### Step 1: Prepare Build Directory
-
-```bash
-mkdir build && cd build
-```
-
-### Step 2: Configure
-
-Run `cmake` with the appropriate flags. You must manually define the compiler if it is not your system default.
-
-**Configuration Flags:**
-
-* **Debug Options:**
-* `-DDEBUG=ON` (Enable debug symbols/O0)
-* `-DND_DEBUG=ON` (Enable internal logging)
-
-
-* **SIMD Selectors (Choose One):**
-* `-DUSE_AVX2=ON`
-* `-DUSE_AVX512=ON`
-* `-DUSE_NEON=ON`
-* `-DUSE_SVE2=ON`
-
-
-**Example (x86_64 AVX512 Release):**
-
-```bash
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DUSE_AVX512=ON \
-      ..
-```
-
-### Step 3: Compile
-
-```bash
-make -j$(nproc)
-```
-
-### Running the Built Binary
-
-After a successful build, the binary will be generated in the `build/` directory.
-
-### Binary Naming
-
-The output binary name depends on the SIMD flag used during compilation:
-
-* `ndd-avx2`
-* `ndd-avx512`
-* `ndd-neon` (or `ndd-neon-darwin` for mac)
-* `ndd-sve2`
-
-A symlink called `ndd` links to the binary compiled for the current build.
-
-### Runtime Environment Variables
-
-Some environment variables **ndd** reads at runtime:
-
-* `NDD_DATA_DIR`: Defines the data directory
-* `NDD_AUTH_TOKEN`: Optional authentication token (see below)
-
-### Authentication
-
-**ndd** supports two authentication modes:
-
-**Open Mode (No Authentication)** - Default when `NDD_AUTH_TOKEN` is not set:
-```bash
-# All APIs work without authentication
-./build/ndd
-curl http://{{BASE_URL}}/api/v1/index/list
-```
-
-**Token Mode** - When `NDD_AUTH_TOKEN` is set:
-```bash
-# Generate a secure token
-export NDD_AUTH_TOKEN=$(openssl rand -hex 32)
-./build/ndd
-
-# All protected APIs require the token in Authorization header
-curl -H "Authorization: $NDD_AUTH_TOKEN" http://{{BASE_URL}}/api/v1/index/list
-```
-
-### Execution Example
-
-To run the database using the AVX2 binary and a local `data` folder:
-
-```bash
-# 1. Create the data directory
-mkdir -p ./data
-
-# 2. Export the environment variable and run
-export NDD_DATA_DIR=$(pwd)/data
-./build/ndd
-```
-
-Alternatively, as a single line:
-
-```bash
-NDD_DATA_DIR=./data ./build/ndd
-```
-
----
-
-
-
-## 3. Docker Deployment
-
-We provide a Dockerfile for easy containerization. This ensures a consistent runtime environment and simplifies the deployment process across various platforms.
-
-### Build the Image
-
-You **must** specify the target architecture (`avx2`, `avx512`, `neon`, `sve2`) using the `BUILD_ARCH` build argument. You can optionally enable a debug build using the `DEBUG` argument.
-
-```bash
-# Production Build (AVX2) (for x86_64 systems)
-docker build --ulimit nofile=100000:100000 --build-arg BUILD_ARCH=avx2 -t endee-oss:latest -f ./infra/Dockerfile .
-
-# Debug Build (Neon) (for arm64, mac apple silicon)
-docker build --ulimit nofile=100000:100000 --build-arg BUILD_ARCH=neon --build-arg DEBUG=true -t endee-oss:latest -f ./infra/Dockerfile .
-```
-
-### Run the Container
-
-The container exposes port `8080` and stores data in `/data` inside container. You should persist this data using a docker volume.
-
-```bash
-docker run \
-  -p 8080:8080 \
-  -v endee-data:/data \
-  -e NDD_AUTH_TOKEN="your_secure_token" \
-  --name endee-server \
-  endee-oss:latest
-```
-
-leave `NDD_AUTH_TOKEN` empty or remove it to run endee without authentication.
-
-### Alternatively: Docker Compose
-
-You can also use `docker-compose` to run the service.
-
-1. Start the container:
-   ```bash
-   docker-compose up
-   ```
-
----
-
-## 4. Running Docker container from registry
-
-You can run Endee directly using the pre-built image from Docker Hub without building locally.
-
-### Using Docker Compose
-
-Create a new directory for Endee:
-
-```bash
-mkdir endee && cd endee
-```
-
-Inside this directory, create a file named `docker-compose.yml` and copy the following content into it:
-
-```yaml
-services:
-  endee:
-    image: endeeio/endee-server:latest
-    container_name: endee-server
-    ports:
-      - "8080:8080"
-    environment:
-      NDD_NUM_THREADS: 0
-      NDD_AUTH_TOKEN: ""  # Optional: set for authentication
-    volumes:
-      - endee-data:/data
-    restart: unless-stopped
-
-volumes:
-  endee-data:
-```
-
-Then run:
-```bash
-docker compose up -d
-```
-
-for more details visit [docs.endee.io](https://docs.endee.io/quick-start)
-
----
-
-## Contribution
-
-We welcome contributions from the community to help make vector search faster and more accessible for everyone. To contribute:
-
-* **Submit Pull Requests**: Have a fix or a new feature? Fork the repo, create a branch, and send a PR.
-* **Report Issues**: Found a bug or a performance bottleneck? Open an issue on GitHub with steps to reproduce it.
-* **Suggest Improvements**: We are always looking to optimize performance; feel free to suggest new CPU target optimizations or architectural enhancements.
-* **Feature Requests**: If there is a specific functionality you need, start a discussion in the issues section.
-
----
 
 ## License
 
-Endee is open source software licensed under the
-**Apache License 2.0**.
-
-You are free to use, modify, and distribute this software for
-personal, commercial, and production use.
-
-See the LICENSE file for full license terms.
-
----
-
-## Trademark and Branding
-
-“Endee” and the Endee logo are trademarks of Endee Labs.
-
-The Apache License 2.0 does **not** grant permission to use the Endee name,
-logos, or branding in a way that suggests endorsement or affiliation.
-
-If you offer a hosted or managed service based on this software, you must:
-- Use your own branding
-- Avoid implying it is an official Endee service
-
-For trademark or branding permissions, contact: enterprise@endee.io
-
----
-
-## Third-Party Software
-
-This project includes or depends on third-party software components that are
-licensed under their respective open source licenses.
-
-Use of those components is governed by the terms and conditions of their
-individual licenses, not by the Apache License 2.0 for this project.
+Apache License 2.0
